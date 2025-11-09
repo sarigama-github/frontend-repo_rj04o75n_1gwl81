@@ -6,7 +6,9 @@ import Footer from './components/Footer';
 import BackendConfigBar from './components/BackendConfigBar';
 
 const App = () => {
-  const defaultApi = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+  // Prefer env, else fall back to the live backend URL so the hosted preview works out-of-the-box
+  const hostedBackend = 'https://ta-01k9kp226w6e89hg37qg0e3jrg-8000.wo-nue4yps4jzha44ndc7abb5t2y.w.modal.host';
+  const defaultApi = import.meta.env.VITE_BACKEND_URL || hostedBackend;
   const [apiBase, setApiBase] = useState(defaultApi);
   const [role, setRole] = useState(null);
 

@@ -3,11 +3,17 @@ import { Globe, WifiOff, Wifi, Save } from 'lucide-react';
 
 const isHosted = () => {
   try {
-    return typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.');
+    return (
+      typeof window !== 'undefined' &&
+      !window.location.hostname.includes('localhost') &&
+      !window.location.hostname.includes('127.')
+    );
   } catch {
     return false;
   }
 };
+
+const normalizeBase = (url) => (url || '').replace(/\/$/, '');
 
 const BackendConfigBar = ({ apiBase, onChange }) => {
   const [value, setValue] = useState(apiBase);
@@ -18,10 +24,11 @@ const BackendConfigBar = ({ apiBase, onChange }) => {
   }, [apiBase]);
 
   const ping = async () => {
-    if (!value) return;
+    const base = normalizeBase(value);
+    if (!base) return;
     setStatus('checking');
     try {
-      const res = await fetch(`${value.replace(/\/$/, '')}/docs`, { method: 'GET' });
+      const res = await fetch(`${base}/ping`, { method: 'GET' });
       if (res.ok) {
         setStatus('ok');
       } else {
@@ -33,8 +40,11 @@ const BackendConfigBar = ({ apiBase, onChange }) => {
   };
 
   const save = () => {
-    onChange(value);
-    localStorage.setItem('hl_api_base', value);
+    const base = normalizeBase(value);
+    onChange(base);
+    try {
+      localStorage.setItem('hl_api_base', base);
+    } catch {}
     ping();
   };
 

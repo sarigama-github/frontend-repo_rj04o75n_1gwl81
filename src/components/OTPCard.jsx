@@ -22,25 +22,31 @@ const OTPCard = ({ role, apiBase }) => {
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const normalizeBase = (url) => (url || '').replace(/\/$/, '');
+
   const sendOtp = async () => {
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`${apiBase}/send-otp`, {
+      const base = normalizeBase(apiBase);
+      const res = await fetch(`${base}/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, via }),
       });
-      if (!res.ok) throw new Error('Network');
-      const data = await res.json();
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch {}
+      if (!res.ok) throw new Error(data?.detail || 'Network');
       if (data.status === 'sent') {
         setPhase('verify');
-        setMessage({ type: 'success', text: 'OTP sent! Please check your ' + (via === 'email' ? 'email.' : 'phone.') });
+        const debugInfo = data.debug_code ? ` (demo code: ${data.debug_code})` : '';
+        setMessage({ type: 'success', text: 'OTP sent! Please check your ' + (via === 'email' ? 'email.' : 'phone.') + debugInfo });
       } else {
         setMessage({ type: 'error', text: data.detail || 'Failed to send OTP' });
       }
     } catch (e) {
-      setMessage({ type: 'error', text: 'Network error. Is the backend running?' });
+      setMessage({ type: 'error', text: (e?.message?.includes('Invalid') ? e.message : 'Network error. Is the backend running?') });
     } finally {
       setLoading(false);
     }
@@ -50,22 +56,27 @@ const OTPCard = ({ role, apiBase }) => {
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch(`${apiBase}/verify-otp`, {
+      const base = normalizeBase(apiBase);
+      const res = await fetch(`${base}/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, otp }),
       });
-      if (!res.ok) throw new Error('Network');
-      const data = await res.json();
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch {}
+      if (!res.ok) throw new Error(data?.detail || 'Network');
       if (data.status === 'verified') {
-        localStorage.setItem('hl_token', data.token);
-        localStorage.setItem('hl_role', role);
+        try {
+          localStorage.setItem('hl_token', data.token);
+          localStorage.setItem('hl_role', role);
+        } catch {}
         window.location.href = role === 'jobseeker' ? '/dashboard/jobseeker' : '/dashboard/recruiter';
       } else {
         setMessage({ type: 'error', text: data.detail || 'Invalid OTP' });
       }
     } catch (e) {
-      setMessage({ type: 'error', text: 'Network error. Is the backend running?' });
+      setMessage({ type: 'error', text: e?.message || 'Network error. Is the backend running?' });
     } finally {
       setLoading(false);
     }
