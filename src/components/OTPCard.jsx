@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, Phone, Send, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const Input = ({ label, icon: Icon, helper, ...props }) => (
@@ -15,8 +15,10 @@ const Input = ({ label, icon: Icon, helper, ...props }) => (
   </label>
 );
 
+const normalizeIdentifier = (val) => (val || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+
 const validateEmail = (email) => {
-  const value = (email || '').trim();
+  const value = normalizeIdentifier(email).toLowerCase();
   const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // universal, accepts mixed-case and modern TLDs
   return regex.test(value);
 };
@@ -31,11 +33,25 @@ const OTPCard = ({ role, apiBase }) => {
 
   const normalizeBase = (url) => (url || '').replace(/\/$/, '');
 
+  // Live-clear error message when user fixes input
+  useEffect(() => {
+    if (message?.type === 'error') {
+      if (via === 'email') {
+        if (validateEmail(identifier)) {
+          setMessage(null);
+        }
+      } else if (normalizeIdentifier(identifier)) {
+        setMessage(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identifier, via]);
+
   const sendOtp = async () => {
     setLoading(true);
     setMessage(null);
     try {
-      const id = identifier.trim();
+      const id = normalizeIdentifier(identifier);
       if (!id) {
         setMessage({ type: 'error', text: 'Please enter your email or phone number' });
         setLoading(false);
@@ -79,7 +95,7 @@ const OTPCard = ({ role, apiBase }) => {
       const res = await fetch(`${base}/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: identifier.trim(), otp }),
+        body: JSON.stringify({ identifier: normalizeIdentifier(identifier), otp }),
       });
       const text = await res.text();
       let data = {};
@@ -133,7 +149,7 @@ const OTPCard = ({ role, apiBase }) => {
         <Input
           label={via === 'email' ? 'Email address' : 'Phone number'}
           icon={via === 'email' ? Mail : Phone}
-          type={via === 'email' ? 'email' : 'tel'}
+          type={via === 'email' ? 'text' : 'tel'}
           placeholder={via === 'email' ? 'Shivanigundlapally@gmail.com' : '+12345678901'}
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
@@ -153,7 +169,7 @@ const OTPCard = ({ role, apiBase }) => {
       {phase === 'collect' && (
         <button
           onClick={sendOtp}
-          disabled={loading || !identifier.trim()}
+          disabled={loading || !normalizeIdentifier(identifier)}
           className="mt-5 inline-flex items-center gap-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Send size={16} /> {loading ? 'Sending…' : 'Send OTP'}
