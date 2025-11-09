@@ -1,16 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Hero3D from './components/Hero3D';
 import RoleSelector from './components/RoleSelector';
 import OTPCard from './components/OTPCard';
 import Footer from './components/Footer';
+import BackendConfigBar from './components/BackendConfigBar';
 
 const App = () => {
+  const defaultApi = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+  const [apiBase, setApiBase] = useState(defaultApi);
   const [role, setRole] = useState(null);
-  const apiBase = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('hl_api_base');
+      if (saved) setApiBase(saved);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950">
       <Hero3D />
+
+      <BackendConfigBar apiBase={apiBase} onChange={setApiBase} />
 
       <main className="flex-1 px-6 py-10">
         <div className="max-w-5xl mx-auto">
