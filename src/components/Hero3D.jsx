@@ -1,11 +1,20 @@
+import React from 'react';
 import Spline from '@splinetool/react-spline';
 
-export default function Hero3D() {
+const Hero3D = () => {
   return (
-    <div className="absolute inset-0">
-      <Spline scene="https://prod.spline.design/2Cz7Gz2Gm7L6Il9d/scene.splinecode" style={{ width: '100%', height: '100%' }} />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/90" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-slate-950/80 to-transparent" />
+    <div className="absolute inset-0 overflow-hidden">
+      <div className="w-full h-full">
+        <Spline
+          scene="https://prod.spline.design/6zPgI1Vd0y8I5j7N/scene.splinecode"
+          style={{ width: '100%', height: '100%' }}
+        />
+      </div>
+      {/* Soft gradient overlays for readability; they won't block pointer events */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.0),rgba(0,0,0,0.5))]" />
     </div>
   );
-}
+};
+
+export default Hero3D;

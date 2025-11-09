@@ -1,9 +1,12 @@
-export default function Footer() {
+import React from 'react';
+
+const Footer = () => {
+  const year = new Date().getFullYear();
   return (
-    <footer className="relative z-10 mt-16 border-t border-white/10/50">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-sm text-slate-400">
-        © {new Date().getFullYear()} HireLens — Elevating hiring with clarity.
-      </div>
+    <footer className="w-full text-center py-6 text-sm text-gray-600">
+      <p>© {year} HireLens. Crafted with care.</p>
     </footer>
   );
-}
+};
+
+export default Footer;
