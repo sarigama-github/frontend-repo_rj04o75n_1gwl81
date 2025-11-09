@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Phone, Send, CheckCircle2, AlertTriangle } from 'lucide-react';
 
-const Input = ({ label, icon: Icon, ...props }) => (
+const Input = ({ label, icon: Icon, helper, ...props }) => (
   <label className="block">
     <span className="text-sm text-slate-300">{label}</span>
     <div className="mt-1 flex items-center gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2 focus-within:ring-2 focus-within:ring-sky-400">
@@ -11,8 +11,15 @@ const Input = ({ label, icon: Icon, ...props }) => (
         {...props}
       />
     </div>
+    {helper}
   </label>
 );
+
+const validateEmail = (email) => {
+  const value = (email || '').trim();
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // universal, accepts mixed-case and modern TLDs
+  return regex.test(value);
+};
 
 const OTPCard = ({ role, apiBase }) => {
   const [via, setVia] = useState('email');
@@ -28,11 +35,23 @@ const OTPCard = ({ role, apiBase }) => {
     setLoading(true);
     setMessage(null);
     try {
+      const id = identifier.trim();
+      if (!id) {
+        setMessage({ type: 'error', text: 'Please enter your email or phone number' });
+        setLoading(false);
+        return;
+      }
+      if (via === 'email' && !validateEmail(id)) {
+        setMessage({ type: 'error', text: 'Please enter a valid email address' });
+        setLoading(false);
+        return;
+      }
+
       const base = normalizeBase(apiBase);
       const res = await fetch(`${base}/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, via }),
+        body: JSON.stringify({ identifier: id, via }),
       });
       const text = await res.text();
       let data = {};
@@ -60,7 +79,7 @@ const OTPCard = ({ role, apiBase }) => {
       const res = await fetch(`${base}/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, otp }),
+        body: JSON.stringify({ identifier: identifier.trim(), otp }),
       });
       const text = await res.text();
       let data = {};
@@ -115,13 +134,16 @@ const OTPCard = ({ role, apiBase }) => {
           label={via === 'email' ? 'Email address' : 'Phone number'}
           icon={via === 'email' ? Mail : Phone}
           type={via === 'email' ? 'email' : 'tel'}
-          placeholder={via === 'email' ? 'shivani@example.com' : '+919502536635'}
+          placeholder={via === 'email' ? 'Shivanigundlapally@gmail.com' : '+12345678901'}
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
+          helper={message?.type === 'error' ? (
+            <p className="text-red-400 mt-1 text-sm">⚠️ {message.text}</p>
+          ) : null}
         />
       </div>
 
-      {message && (
+      {message && message.type !== 'error' && (
         <div className={`mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${message.type === 'error' ? 'bg-red-500/10 text-red-200 ring-1 ring-red-500/30' : 'bg-emerald-500/10 text-emerald-200 ring-1 ring-emerald-500/30'}`}>
           {message.type === 'error' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
           <span>{message.text}</span>
@@ -131,7 +153,7 @@ const OTPCard = ({ role, apiBase }) => {
       {phase === 'collect' && (
         <button
           onClick={sendOtp}
-          disabled={loading || !identifier}
+          disabled={loading || !identifier.trim()}
           className="mt-5 inline-flex items-center gap-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Send size={16} /> {loading ? 'Sending…' : 'Send OTP'}
@@ -151,7 +173,7 @@ const OTPCard = ({ role, apiBase }) => {
           />
           <button
             onClick={verifyOtp}
-            disabled={loading || otp.length < 4}
+            disabled={loading || otp.trim().length < 4}
             className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <CheckCircle2 size={16} /> {loading ? 'Verifying…' : 'Verify & Sign In'}
