@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Phone, Send, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Mail, Phone, Send, CheckCircle2, AlertTriangle, Wand2 } from 'lucide-react';
 
 const Input = ({ label, icon: Icon, helper, ...props }) => (
   <label className="block">
@@ -23,6 +23,31 @@ const validateEmail = (email) => {
   return regex.test(value);
 };
 
+// Relaxed phone normalization + validation
+const normalizePhone = (phone) => {
+  const raw = normalizeIdentifier(phone);
+  // Keep leading + if present, strip all non-digits otherwise
+  const hasPlus = raw.startsWith('+');
+  const digits = raw.replace(/[^0-9]/g, '');
+  return hasPlus ? `+${digits}` : digits;
+};
+
+const validatePhoneRelaxed = (phone) => {
+  const norm = normalizePhone(phone);
+  // Accept 7-15 digits per ITU E.164 guidance (flexible)
+  const digits = norm.replace(/\D/g, '');
+  return digits.length >= 7 && digits.length <= 15;
+};
+
+const isLikelyEmail = (value) => {
+  const v = normalizeIdentifier(value);
+  // Quick heuristic: contains @ and a dot after it
+  if (!v.includes('@')) return false;
+  const at = v.indexOf('@');
+  const dot = v.indexOf('.', at + 1);
+  return dot > at + 1;
+};
+
 const OTPCard = ({ role, apiBase }) => {
   const [via, setVia] = useState('email');
   const [identifier, setIdentifier] = useState('');
@@ -30,8 +55,22 @@ const OTPCard = ({ role, apiBase }) => {
   const [phase, setPhase] = useState('collect');
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [autoDetect, setAutoDetect] = useState(true);
 
   const normalizeBase = (url) => (url || '').replace(/\/$/, '');
+
+  // Auto-detect channel based on input
+  useEffect(() => {
+    if (!autoDetect) return;
+    const val = normalizeIdentifier(identifier);
+    if (!val) return;
+    if (isLikelyEmail(val)) {
+      if (via !== 'email') setVia('email');
+    } else {
+      if (via !== 'phone') setVia('phone');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identifier, autoDetect]);
 
   // Live-clear error message when user fixes input
   useEffect(() => {
@@ -40,7 +79,7 @@ const OTPCard = ({ role, apiBase }) => {
         if (validateEmail(identifier)) {
           setMessage(null);
         }
-      } else if (normalizeIdentifier(identifier)) {
+      } else if (validatePhoneRelaxed(identifier)) {
         setMessage(null);
       }
     }
@@ -51,23 +90,35 @@ const OTPCard = ({ role, apiBase }) => {
     setLoading(true);
     setMessage(null);
     try {
-      const id = normalizeIdentifier(identifier);
-      if (!id) {
+      const idRaw = normalizeIdentifier(identifier);
+      if (!idRaw) {
         setMessage({ type: 'error', text: 'Please enter your email or phone number' });
         setLoading(false);
         return;
       }
-      if (via === 'email' && !validateEmail(id)) {
-        setMessage({ type: 'error', text: 'Please enter a valid email address' });
-        setLoading(false);
-        return;
+
+      let idToSend = idRaw;
+      if (via === 'email') {
+        if (!validateEmail(idRaw)) {
+          setMessage({ type: 'error', text: 'Please enter a valid email address' });
+          setLoading(false);
+          return;
+        }
+        idToSend = idRaw.toLowerCase();
+      } else {
+        if (!validatePhoneRelaxed(idRaw)) {
+          setMessage({ type: 'error', text: 'Please enter a valid phone number' });
+          setLoading(false);
+          return;
+        }
+        idToSend = normalizePhone(idRaw);
       }
 
       const base = normalizeBase(apiBase);
       const res = await fetch(`${base}/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: id, via }),
+        body: JSON.stringify({ identifier: idToSend, via }),
       });
       const text = await res.text();
       let data = {};
@@ -95,7 +146,7 @@ const OTPCard = ({ role, apiBase }) => {
       const res = await fetch(`${base}/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: normalizeIdentifier(identifier), otp }),
+        body: JSON.stringify({ identifier: normalizeIdentifier(via === 'phone' ? normalizePhone(identifier) : identifier.toLowerCase()), otp }),
       });
       const text = await res.text();
       let data = {};
@@ -122,27 +173,36 @@ const OTPCard = ({ role, apiBase }) => {
       <h2 className="text-xl md:text-2xl font-semibold text-white">Sign In — Welcome to HireLens</h2>
       <p className="text-slate-300 text-sm mt-1">Signing in as <span className="text-sky-300 font-medium">{role === 'jobseeker' ? 'Job Seeker' : 'Company'}</span></p>
 
-      <div className="mt-4 flex items-center gap-4">
-        <label className="flex items-center gap-2 text-slate-200">
-          <input
-            type="radio"
-            name="via"
-            value="email"
-            checked={via === 'email'}
-            onChange={(e) => setVia(e.target.value)}
-          />
-          <span className="flex items-center gap-1"><Mail size={16} /> Email</span>
-        </label>
-        <label className="flex items-center gap-2 text-slate-200">
-          <input
-            type="radio"
-            name="via"
-            value="phone"
-            checked={via === 'phone'}
-            onChange={(e) => setVia(e.target.value)}
-          />
-          <span className="flex items-center gap-1"><Phone size={16} /> Phone</span>
-        </label>
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-slate-200">
+            <input
+              type="radio"
+              name="via"
+              value="email"
+              checked={via === 'email'}
+              onChange={(e) => { setVia(e.target.value); setAutoDetect(false); }}
+            />
+            <span className="flex items-center gap-1"><Mail size={16} /> Email</span>
+          </label>
+          <label className="flex items-center gap-2 text-slate-200">
+            <input
+              type="radio"
+              name="via"
+              value="phone"
+              checked={via === 'phone'}
+              onChange={(e) => { setVia(e.target.value); setAutoDetect(false); }}
+            />
+            <span className="flex items-center gap-1"><Phone size={16} /> Phone</span>
+          </label>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAutoDetect((v) => !v)}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition ${autoDetect ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}
+        >
+          <Wand2 size={14} /> {autoDetect ? 'Auto-detect: On' : 'Auto-detect: Off'}
+        </button>
       </div>
 
       <div className="mt-4">
@@ -150,13 +210,16 @@ const OTPCard = ({ role, apiBase }) => {
           label={via === 'email' ? 'Email address' : 'Phone number'}
           icon={via === 'email' ? Mail : Phone}
           type={via === 'email' ? 'text' : 'tel'}
-          placeholder={via === 'email' ? 'Shivanigundlapally@gmail.com' : '+12345678901'}
+          placeholder={via === 'email' ? 'name@example.com' : '+1 (555) 123‑4567'}
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
           helper={message?.type === 'error' ? (
             <p className="text-red-400 mt-1 text-sm">⚠️ {message.text}</p>
           ) : null}
         />
+        {via === 'phone' && (
+          <p className="text-xs text-slate-400 mt-1">We accept most formats. You can include country code or symbols; we’ll handle it.</p>
+        )}
       </div>
 
       {message && message.type !== 'error' && (
