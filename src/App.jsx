@@ -1,64 +1,53 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Hero3D from './components/Hero3D';
+import BackendConfigBar from './components/BackendConfigBar';
 import RoleSelector from './components/RoleSelector';
 import OTPCard from './components/OTPCard';
 import Footer from './components/Footer';
-import BackendConfigBar from './components/BackendConfigBar';
 
-const App = () => {
-  // Prefer env, else fall back to the live backend URL so the hosted preview works out-of-the-box
-  const hostedBackend = 'https://ta-01k9kp226w6e89hg37qg0e3jrg-8000.wo-nue4yps4jzha44ndc7abb5t2y.w.modal.host';
-  const defaultApi = import.meta.env.VITE_BACKEND_URL || hostedBackend;
-  const [apiBase, setApiBase] = useState(defaultApi);
-  const [role, setRole] = useState(null);
+export default function App() {
+  const hostedPreviewBase = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host.replace(/-3000\./, '-8000.')}` : '';
+  const initialApiBase = useMemo(() => {
+    const fromEnv = import.meta.env.VITE_BACKEND_URL;
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem('hl_api_base') : '';
+    return stored || fromEnv || hostedPreviewBase || '';
+  }, [hostedPreviewBase]);
+
+  const [apiBase, setApiBase] = useState(initialApiBase);
+  const [role, setRole] = useState('jobseeker');
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('hl_api_base');
-      if (saved) setApiBase(saved);
-    } catch {
-      // ignore
+    if (apiBase) {
+      try {
+        window.localStorage.setItem('hl_api_base', apiBase);
+      } catch {}
     }
-  }, []);
+  }, [apiBase]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950">
+    <div className="relative min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
       <Hero3D />
 
-      <BackendConfigBar apiBase={apiBase} onChange={setApiBase} />
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <BackendConfigBar apiBase={apiBase} onChange={setApiBase} hostedPreviewBase={hostedPreviewBase} />
 
-      <main className="flex-1 px-6 py-10">
-        <div className="max-w-5xl mx-auto">
-          {!role ? (
-            <div className="grid md:grid-cols-5 gap-8 items-start">
-              <div className="md:col-span-2">
-                <h2 className="text-2xl font-semibold text-white">Who are you?</h2>
-                <p className="text-slate-300 mt-2">Choose your role to continue with sign-in.</p>
-                <div className="mt-5">
-                  <RoleSelector onSelect={setRole} />
-                </div>
-              </div>
-              <div className="md:col-span-3">
-                <OTPCard role={role || 'jobseeker'} apiBase={apiBase} />
-              </div>
-            </div>
-          ) : (
-            <div>
-              <OTPCard role={role} apiBase={apiBase} />
-              <button
-                onClick={() => setRole(null)}
-                className="mt-6 text-sm text-slate-300 underline hover:text-white"
-              >
-                Change role
-              </button>
-            </div>
-          )}
-        </div>
-      </main>
+        <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center gap-8">
+          <div className="w-full max-w-4xl text-center space-y-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight">
+              HireLens — Sign in with One-Time Passcode
+            </h1>
+            <p className="text-slate-300 max-w-2xl mx-auto">
+              Choose your role, enter your email or phone, and we’ll send you a secure OTP. No passwords, no friction.
+            </p>
+          </div>
 
-      <Footer />
+          <RoleSelector value={role} onSelect={setRole} />
+
+          <OTPCard apiBase={apiBase} role={role} />
+        </main>
+
+        <Footer />
+      </div>
     </div>
   );
-};
-
-export default App;
+}
